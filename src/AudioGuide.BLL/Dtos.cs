@@ -53,8 +53,7 @@ public record VisitDto(
 public record DailyVisitDto(string Date, int Sessions, int Visitors);
 
 public record VisitOverviewDto(
-    int OnlineNow, int SessionsInRange, int UniqueVisitorsInRange, int NewVisitorsInRange,
-    int ReturningVisitorsInRange, int TotalVisitors,
+    int OnlineNow, int SessionsInRange, int UniqueVisitorsInRange, int TotalVisitors,
     List<DailyVisitDto> Daily, List<StatItem> ByDevice, List<StatItem> ByLanguage);
 
 public record PagedResult<T>(List<T> Items, int Total, int Page, int PageSize);

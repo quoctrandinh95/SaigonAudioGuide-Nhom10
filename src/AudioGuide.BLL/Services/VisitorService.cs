@@ -119,7 +119,6 @@ public class VisitorService : IVisitorService
         var online = await _visitors.CountOnlineAsync(now - OnlineWindow);
         var sessions = await _visitors.CountSessionsAsync(from);
         var unique = await _visitors.CountActiveVisitorsAsync(from);
-        var fresh = await _visitors.CountNewVisitorsAsync(from);
         var total = await _visitors.CountVisitorsAsync();
 
         var points = await _visitors.GetTimePointsAsync(from);
@@ -134,7 +133,7 @@ public class VisitorService : IVisitorService
         var byLang = (await _visitors.CountSessionsByLanguageAsync(from))
             .OrderByDescending(x => x.Count).Select(x => new StatItem(x.Key, x.Key, x.Count)).ToList();
 
-        return new VisitOverviewDto(online, sessions, unique, fresh, Math.Max(0, unique - fresh), total, daily, byDevice, byLang);
+        return new VisitOverviewDto(online, sessions, unique, total, daily, byDevice, byLang);
     }
 
     public Task<int> PurgeOldSessionsAsync(int retentionDays)

@@ -163,22 +163,16 @@ public class VisitorServiceTests
     }
 
     [Fact]
-    public async Task Overview_CountsVisitorsSessionsAndReturning()
+    public async Task Overview_CountsVisitorsAndSessions()
     {
         var (db, svc) = Create();
         await svc.PingAsync(Ping(Client1, Session1), Info);
         await svc.PingAsync(Ping(Client2, Session2, "en"), new ClientInfo("198.51.100.2", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Safari/604.1"));
 
-        // Client2 đã tồn tại từ 30 ngày trước → trong kỳ 7 ngày là "khách quay lại".
-        db.Visitors.First(v => v.ClientId == Client2).FirstSeenAt = DateTime.UtcNow.AddDays(-30);
-        await db.SaveChangesAsync();
-
         var o = await svc.GetOverviewAsync(7);
         Assert.Equal(2, o.OnlineNow);
         Assert.Equal(2, o.SessionsInRange);
         Assert.Equal(2, o.UniqueVisitorsInRange);
-        Assert.Equal(1, o.NewVisitorsInRange);
-        Assert.Equal(1, o.ReturningVisitorsInRange);
         Assert.Equal(2, o.TotalVisitors);
         Assert.Equal(2, Assert.Single(o.Daily).Sessions);
         Assert.Contains(o.ByDevice, x => x.Key == "mobile" && x.Count == 1);

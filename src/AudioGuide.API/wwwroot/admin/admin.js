@@ -407,7 +407,6 @@
         <div class="card"><div class="muted">Đang online</div><h2><span class="dot"></span>${o.onlineNow}</h2></div>
         <div class="card"><div class="muted">Lượt truy cập</div><h2>${o.sessionsInRange}</h2></div>
         <div class="card"><div class="muted">Thiết bị khác nhau</div><h2>${o.uniqueVisitorsInRange}</h2></div>
-        <div class="card"><div class="muted">Khách mới / quay lại</div><h2>${o.newVisitorsInRange} / ${o.returningVisitorsInRange}</h2></div>
         <div class="card"><div class="muted">Tổng thiết bị từ trước đến nay</div><h2>${o.totalVisitors}</h2></div>
       </div>
 

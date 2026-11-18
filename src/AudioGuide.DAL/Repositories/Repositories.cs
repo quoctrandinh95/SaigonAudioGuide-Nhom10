@@ -166,7 +166,6 @@ public interface IVisitorRepository
     Task<int> CountSessionsAsync(DateTime fromUtc);
     Task<int> CountOnlineAsync(DateTime sinceUtc);
     Task<int> CountActiveVisitorsAsync(DateTime fromUtc);                   // số thiết bị khác nhau có phiên trong kỳ
-    Task<int> CountNewVisitorsAsync(DateTime fromUtc);
     Task<int> CountVisitorsAsync();
     Task<List<VisitTimePoint>> GetTimePointsAsync(DateTime fromUtc);
     Task<List<PlayCount>> CountSessionsByDeviceAsync(DateTime fromUtc);
@@ -219,9 +218,6 @@ public class VisitorRepository : IVisitorRepository
 
     public Task<int> CountActiveVisitorsAsync(DateTime fromUtc) =>
         _db.VisitSessions.Where(s => s.StartedAt >= fromUtc).Select(s => s.VisitorId).Distinct().CountAsync();
-
-    public Task<int> CountNewVisitorsAsync(DateTime fromUtc) =>
-        _db.Visitors.CountAsync(v => v.FirstSeenAt >= fromUtc);
 
     public Task<int> CountVisitorsAsync() => _db.Visitors.CountAsync();
 

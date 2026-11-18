@@ -205,7 +205,7 @@ flowchart LR
 | Actor Action | System Response |
 |---|---|
 | 1. Perform {UC5 Đăng nhập quản trị}. | |
-| 2. Admin mở tab "Truy cập". A1 | 3. Hệ thống hiển thị số người đang online, số lượt truy cập, số thiết bị khác nhau, khách mới/quay lại, biểu đồ theo ngày, phân bố thiết bị/ngôn ngữ. |
+| 2. Admin mở tab "Truy cập". A1 | 3. Hệ thống hiển thị số người đang online, số lượt truy cập, số thiết bị khác nhau, tổng thiết bị từ trước đến nay, biểu đồ theo ngày, phân bố thiết bị/ngôn ngữ. |
 | | 4. Hệ thống hiển thị danh sách "Đang online" (tự làm mới 5 giây) và lịch sử truy cập phân trang. Use case kết thúc. |
 
 **Alternative Paths:** A1. Admin đổi khoảng thời gian (24 giờ/7/30/90 ngày) hoặc chuyển trang lịch sử.

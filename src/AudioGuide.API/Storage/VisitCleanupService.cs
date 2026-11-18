@@ -4,7 +4,7 @@ namespace AudioGuide.API.Storage;
 
 /// <summary>
 /// Định kỳ xóa lịch sử truy cập cũ để bảng VisitSessions không phình mãi (mặc định giữ 90 ngày,
-/// cấu hình bằng Retention:VisitDays; đặt 0 để tắt). Số liệu khách mới/quay lại (bảng Visitors) vẫn được giữ.
+/// cấu hình bằng Retention:VisitDays; đặt 0 để tắt). Dữ liệu thiết bị (bảng Visitors) vẫn được giữ.
 /// </summary>
 public class VisitCleanupService : BackgroundService
 {

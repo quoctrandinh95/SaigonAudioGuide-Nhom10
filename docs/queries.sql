@@ -2,8 +2,7 @@
 -- Lưu ý: mọi mốc thời gian trong database lưu theo UTC. Giờ Việt Nam = UTC + 7 giờ.
 
 -- Các bảng chính
---   Visitors          mỗi thiết bị/trình duyệt (ClientId ẩn danh, ngôn ngữ thiết bị, số lần quay lại)
---   VisitSessions     mỗi lượt truy cập (IP, thiết bị, trình duyệt, HĐH, ngôn ngữ, vị trí gần đúng, StartedAt, LastSeenAt)
+--   Visitors          mỗi thiết bị/trình duyệ--   VisitSessions     mỗi lượt truy cập (IP, thiết bị, trình duyệt, HĐH, ngôn ngữt (ClientId ẩn danh, ngôn ngữ thiết bị, số lượt truy cập), vị trí gần đúng, StartedAt, LastSeenAt)
 --   PlayLogs          mỗi lượt nghe thuyết minh (địa điểm, ngôn ngữ, gps/manual, ai nghe)
 --   Places / PlaceTranslations / Languages   địa điểm, nội dung đa ngôn ngữ, danh sách ngôn ngữ
 --   AdminUsers        tài khoản quản trị
@@ -46,12 +45,11 @@ SELECT Browser, Os, COUNT(*) AS SoLuot FROM VisitSessions GROUP BY Browser, Os O
 -- 7) Ngôn ngữ người dùng đang dùng trong ứng dụng
 SELECT LanguageCode, COUNT(*) AS SoLuot FROM VisitSessions GROUP BY LanguageCode ORDER BY SoLuot DESC;
 
--- 8) Khách quay lại (đã vào từ 2 lần trở lên)
+-- 8) Thống kê lượt truy cập theo thiết bị
 SELECT ClientId, DeviceLanguage, VisitCount,
        DATE_ADD(FirstSeenAt, INTERVAL 7 HOUR) AS LanDauGioVN,
        DATE_ADD(LastSeenAt, INTERVAL 7 HOUR)  AS GanNhatGioVN
 FROM Visitors
-WHERE VisitCount >= 2
 ORDER BY VisitCount DESC;
 
 -- 9) Địa điểm được nghe nhiều nhất

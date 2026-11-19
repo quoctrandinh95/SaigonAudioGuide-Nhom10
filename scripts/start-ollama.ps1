@@ -1,7 +1,7 @@
 param(
     [switch]$DockerAccess,
     [switch]$Restart,
-    [string]$ModelsPath = 'D:\Tools\OllamaTrial\models',
+    [string]$ModelsPath = "C:\ollama\models"
     [string]$OllamaExe = 'D:\Tools\OllamaTrial\runtime\ollama.exe'
 )
 $ErrorActionPreference = 'Stop'

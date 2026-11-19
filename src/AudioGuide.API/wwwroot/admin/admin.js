@@ -508,22 +508,29 @@
     const max = Math.max(1, ...s.topPlaces.map(x => x.count));
     $('#view').innerHTML = `
       <div class="bar"><h2>Thống kê lượt nghe</h2>
-        <select id="statDays" style="width:auto">
-          ${[7, 30, 90, 365].map(d => `<option value="${d}" ${d === days ? 'selected' : ''}>${d} ngày qua</option>`).join('')}
-        </select></div>
+        <div class="inline" style="align-items:center">
+          <label for="statDays" style="margin:0">Số ngày (5–30)</label>
+          <input id="statDays" type="number" min="5" max="30" step="1" value="${days}" style="width:90px">
+          <button id="btnStatDays" class="primary" type="button">Áp dụng</button>
+        </div></div>
       <div class="grid">
         <div class="card"><div class="muted">Tổng lượt nghe</div><h2>${s.totalPlays}</h2></div>
         <div class="card"><div class="muted">Tự động (GPS)</div><h2>${s.gpsPlays}</h2></div>
         <div class="card"><div class="muted">Thủ công</div><h2>${s.manualPlays}</h2></div>
       </div>
-      <div class="card"><h3>Địa điểm được nghe nhiều nhất</h3>
+      <div class="card"><h3>Địa điểm được nghe nhiều nhất (${days} ngày qua)</h3>
         ${s.topPlaces.map(x => `<div style="margin:8px 0"><div>${esc(x.label)} — <strong>${x.count}</strong></div>
           <div class="bar-fill" style="width:${Math.round(x.count / max * 100)}%"></div></div>`).join('') || '<p class="muted">Chưa có dữ liệu.</p>'}
       </div>
       <div class="card"><h3>Theo ngôn ngữ</h3>
         ${s.byLanguage.map(x => `<div style="margin:6px 0">${esc(x.label)} — <strong>${x.count}</strong></div>`).join('') || '<p class="muted">Chưa có dữ liệu.</p>'}
       </div>`;
-    $('#statDays').onchange = guard(async e => { await renderStats(parseInt(e.target.value, 10)); });
+    $('#btnStatDays').onclick = guard(async () => {
+      const selectedDays = Number($('#statDays').value);
+      if (!Number.isInteger(selectedDays) || selectedDays < 5 || selectedDays > 30)
+        throw new Error('Số ngày thống kê phải là số nguyên từ 5 đến 30.');
+      await renderStats(selectedDays);
+    });
   }
 
   // ---------- Khởi động ----------

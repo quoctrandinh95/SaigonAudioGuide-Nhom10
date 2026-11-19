@@ -73,6 +73,27 @@ public class VisitorServiceTests
     private static readonly ClientInfo Info = new("203.0.113.7", Chrome);
 
     [Fact]
+    public async Task ExpiredVisit_RejectsAccessAndPingEvenWithRecentActivity()
+    {
+        var (db, svc) = Create();
+        await Assert.ThrowsAsync<VisitExpiredException>(() => svc.RequireActiveVisitAsync(Session1));
+        await svc.PingAsync(Ping(Client1, Session1), Info);
+        await svc.RequireActiveVisitAsync(Session1);
+
+        var visit = Assert.Single(db.VisitSessions);
+        visit.StartedAt = DateTime.UtcNow.AddSeconds(-61);
+        var lastSeen = visit.LastSeenAt;
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<VisitExpiredException>(() => svc.RequireActiveVisitAsync(Session1));
+        await Assert.ThrowsAsync<VisitExpiredException>(() => svc.PingAsync(Ping(Client1, Session1), Info));
+        Assert.Equal(lastSeen, visit.LastSeenAt);
+        Assert.Empty(await svc.GetOnlineAsync());
+        Assert.Equal(0, (await svc.GetOverviewAsync(7)).OnlineNow);
+        Assert.False(Assert.Single((await svc.GetVisitsAsync(7, 1, 20)).Items).IsOnline);
+    }
+
+    [Fact]
     public async Task FirstPing_CreatesVisitorAndSession()
     {
         var (db, svc) = Create();

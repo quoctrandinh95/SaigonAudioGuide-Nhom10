@@ -11,3 +11,8 @@ public class NotFoundException : BusinessException
 {
     public NotFoundException(string message) : base(message) { }
 }
+
+public class VisitExpiredException : BusinessException
+{
+    public VisitExpiredException() : base("đã hết thời gian.") { }
+}

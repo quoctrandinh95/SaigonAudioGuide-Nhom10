@@ -6,6 +6,7 @@
   const EXIT_MARGIN_M = 25;             // phải đi ra khỏi bán kính + 25 m thì lần sau vào lại mới phát tiếp (chống nhấp nháy GPS)
   const MAX_ACCURACY_M = 200;           // sai số GPS lớn hơn mức này thì chưa dùng để tự kích hoạt
   const PING_MS = 10 * 1000;            // báo "đang online" cho máy chủ mỗi 10 giây
+  const VISIT_MS = 60 * 1000;
 
   // Chuỗi giao diện theo ngôn ngữ (ngôn ngữ chưa có sẽ dùng tiếng Anh)
   const UI = {
@@ -87,6 +88,15 @@
   };
 
   // ---------- Lưu trữ cục bộ (có thể bị chặn ở chế độ riêng tư → bọc try/catch) ----------
+  const VISIT_TEXT = {
+    vi: ['Phiên kéo dài 60 giây từ khi bấm Bắt đầu.', 'Hết thời gian truy cập', 'Phiên 60 giây đã kết thúc.', 'Còn lại'],
+    en: ['Your 60-second session starts when you press Start.', 'Session expired', 'Your 60-second session has ended.', 'Time left'],
+    zh: ['点击开始后可使用 60 秒。', '访问已结束', '60 秒的访问时间已结束。', '剩余时间'],
+    'zh-TW': ['按下開始後可使用 60 秒。', '存取已結束', '60 秒的使用時間已結束。', '剩餘時間'],
+    ja: ['開始を押すと60秒間利用できます。', '利用時間終了', '60秒の利用時間が終了しました。', '残り時間'],
+    ko: ['시작을 누르면 60초 동안 이용할 수 있습니다.', '이용 시간 종료', '60초 이용 시간이 종료되었습니다.', '남은 시간']
+  };
+
   const store = {
     get: k => { try { return localStorage.getItem(k); } catch { return null; } },
     set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* bỏ qua */ } }
@@ -135,17 +145,22 @@
     wakeLock: null,
     panelOpen: true,        // bảng bên trái đang mở hay thu gọn
     clientId: getId(store, 'clientId'),          // định danh ẩn danh của thiết bị
-    sessionKey: getId(session, 'sessionKey')     // định danh phiên (mỗi tab)
+    sessionKey: getId(session, 'timedSessionKey')
   };
 
   const $ = id => document.getElementById(id);
   const t = key => (UI[state.lang] || UI.en)[key] || UI.en[key] || key;
 
   let map, placeLayer, userMarker, firstFixCentered = false;
+  let visitDeadline = Number(session.get('visitDeadline')) || 0;
+  let visitTimer, pingTimer;
+  let visitReady = false, visitExpired = false;
+  const visitRequests = new AbortController();
 
   // ---------- Tiện ích ----------
   async function api(path, options) {
     const res = await fetch(API + path, options);
+    if (res.status === 410) endVisit();
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return res.status === 204 ? null : res.json();
   }
@@ -200,6 +215,7 @@
     closePlayer();
     renderLangSelect();
     applyUiText();
+    if (!hasActiveVisit()) return;
     try {
       await loadPlaces();
     } catch {
@@ -216,12 +232,84 @@
     $('btnGps').textContent = state.guide ? t('gpsOff') : t('gpsOn');
     $('btnTap').textContent = t('tapToListen');
     $('btnStop').textContent = state.playing || state.pending ? t('stop') : t('close');
-    $('wTitle').textContent = t('wTitle');
-    $('wText').textContent = t('wText');
+    const [limit, expiredTitle, expiredText] = VISIT_TEXT[state.lang] || VISIT_TEXT.en;
+    $('wTitle').textContent = visitExpired ? expiredTitle : t('wTitle');
+    $('wText').textContent = visitExpired ? expiredText : `${t('wText')} ${limit}`;
     $('btnStart').textContent = t('start');
     $('privacy').textContent = t('privacy');
     $('wPrivacy').textContent = t('privacy');
     updatePanelButton();
+  }
+
+  function showWelcome(show) {
+    $('overlay').hidden = !show;
+    document.querySelector('header').inert = show;
+    document.querySelector('main').inert = show;
+  }
+
+  function hasActiveVisit() {
+    if (visitDeadline && Date.now() >= visitDeadline) endVisit();
+    return visitReady && !visitExpired;
+  }
+
+  function updateVisitTimer() {
+    clearTimeout(visitTimer);
+    if (visitExpired) return;
+    const remaining = visitDeadline - Date.now();
+    if (remaining <= 0) { endVisit(); return; }
+    const seconds = Math.ceil(remaining / 1000);
+    const label = (VISIT_TEXT[state.lang] || VISIT_TEXT.en)[3];
+    $('visitTimer').textContent = `${label} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    visitTimer = setTimeout(updateVisitTimer, remaining - (seconds - 1) * 1000);
+  }
+
+  function endVisit() {
+    if (visitExpired) return;
+    visitExpired = true;
+    visitReady = false;
+    visitDeadline = Date.now();
+    session.set('visitDeadline', String(visitDeadline));
+    clearTimeout(visitTimer);
+    clearInterval(pingTimer);
+    visitRequests.abort();
+    stopGuide();
+    $('visitTimer').hidden = true;
+    $('btnStart').hidden = true;
+    $('visitError').hidden = true;
+    showWelcome(true);
+    $('wTitle').tabIndex = -1;
+    $('wTitle').focus();
+  }
+
+  async function connectVisit() {
+    if (visitExpired || visitReady) return;
+    if (visitDeadline && Date.now() >= visitDeadline) { endVisit(); return; }
+    $('btnStart').disabled = true;
+    $('visitError').hidden = true;
+    if (!visitDeadline) {
+      visitDeadline = Date.now() + VISIT_MS;
+      session.set('visitDeadline', String(visitDeadline));
+    }
+    updateVisitTimer();
+    try {
+      await sendPing();
+      if (visitExpired) return;
+      visitReady = true;
+      if (!hasActiveVisit()) return;
+      await loadPlaces();
+      if (!hasActiveVisit()) return;
+      $('visitTimer').hidden = false;
+      showWelcome(false);
+      startGuide();
+      $('btnGps').focus();
+      pingTimer = setInterval(() => { if (document.visibilityState === 'visible') ping(); }, PING_MS);
+    } catch {
+      visitReady = false;
+      if (visitExpired) return;
+      $('visitError').textContent = t('serverErr');
+      $('visitError').hidden = false;
+      $('btnStart').disabled = false;
+    }
   }
 
   // ---------- Bảng bên trái (thu gọn / mở rộng) ----------
@@ -253,7 +341,7 @@
     placeLayer = L.layerGroup().addTo(map);
 
     map.on('click', e => {
-      if (!state.demo) return;
+      if (!state.demo || !hasActiveVisit()) return;
       if (!state.guide) startGuide();
       setPosition(e.latlng.lat, e.latlng.lng, 5, false);
     });
@@ -324,7 +412,9 @@
   }
 
   async function loadPlaces() {
-    state.places = await api('/places?' + new URLSearchParams({ lang: state.lang }));
+    const places = await api('/places?' + new URLSearchParams({ lang: state.lang }), visitOptions());
+    if (!hasActiveVisit()) return;
+    state.places = places;
     refreshDistances();
     renderMarkers();
     renderList();
@@ -339,6 +429,7 @@
 
   // ---------- GPS ----------
   function setPosition(lat, lng, accuracy, real) {
+    if (!hasActiveVisit()) return;
     state.pos = { lat, lng, accuracy };
     state.realGps = real;
     if (!userMarker) {
@@ -415,9 +506,8 @@
 
   // ---------- Bật / tắt thuyết minh tự động ----------
   function startGuide() {
+    if (!hasActiveVisit()) return;
     state.guide = true;
-    store.set('guideStarted', '1');
-    $('overlay').hidden = true;
     state.inside.clear();       // đang đứng sẵn trong một địa điểm khi bật → được tính là "đi vào"
     applyUiText();
     applyGpsMode();
@@ -427,7 +517,6 @@
 
   function stopGuide() {
     state.guide = false;
-    store.set('guideStarted', '0');
     state.queue = [];
     applyGpsMode();
     setStatus('');
@@ -439,8 +528,10 @@
   async function requestWakeLock() {
     try {
       if ('wakeLock' in navigator && !state.wakeLock) {
-        state.wakeLock = await navigator.wakeLock.request('screen');
-        state.wakeLock.addEventListener('release', () => { state.wakeLock = null; });
+        const lock = await navigator.wakeLock.request('screen');
+        if (!hasActiveVisit() || !state.guide || state.wakeLock) { await lock.release(); return; }
+        state.wakeLock = lock;
+        lock.addEventListener('release', () => { if (state.wakeLock === lock) state.wakeLock = null; });
       }
     } catch { /* không bắt buộc */ }
   }
@@ -473,6 +564,7 @@
   }
 
   function play(place, trigger) {
+    if (!hasActiveVisit()) return;
     stopPlayback();
     const token = ++state.playToken;
     state.played.set(place.id, Date.now());
@@ -608,26 +700,35 @@
   }
 
   async function logPlay(place, trigger) {
+    if (!hasActiveVisit()) return;
     try {
-      await fetch(API + '/play-log', {
+      await api('/play-log', {
+        ...visitOptions({ 'Content-Type': 'application/json' }),
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ placeId: place.id, languageCode: place.languageCode, triggerType: trigger, clientId: state.clientId })
       });
     } catch { /* ghi log lỗi không ảnh hưởng trải nghiệm */ }
   }
 
   // ---------- Báo cho máy chủ biết có người đang truy cập ----------
+  function visitOptions(headers = {}) {
+    return { signal: visitRequests.signal, headers: { ...headers, 'X-Visit-Session': state.sessionKey } };
+  }
+
   let pinging = false, pingAgain = false;
   function ping() {
-    // Tránh gửi chồng nhiều gói cùng lúc (mở trang + đổi ngôn ngữ + quay lại tab); gói đến khi đang bận sẽ được gửi ngay sau đó.
+    if (!hasActiveVisit()) return;
     if (pinging) { pingAgain = true; return; }
     pinging = true;
+    sendPing().catch(() => { /* sẽ thử lại ở lần ping kế tiếp */ })
+      .finally(() => { pinging = false; if (pingAgain) { pingAgain = false; ping(); } });
+  }
+
+  function sendPing() {
     const withPos = state.realGps && state.pos;
-    fetch(API + '/visits/ping', {
+    return api('/visits/ping', {
+      ...visitOptions({ 'Content-Type': 'application/json' }),
       method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         clientId: state.clientId,
         sessionKey: state.sessionKey,
@@ -637,8 +738,7 @@
         latitude: withPos ? state.pos.lat : null,
         longitude: withPos ? state.pos.lng : null
       })
-    }).catch(() => { /* không ảnh hưởng trải nghiệm */ })
-      .finally(() => { pinging = false; if (pingAgain) { pingAgain = false; ping(); } });
+    });
   }
 
   // ---------- Khởi tạo ----------
@@ -659,7 +759,7 @@
       if (p) play(p.place, p.trigger);
     };
 
-    $('btnStart').onclick = () => { unlockAudio(); startGuide(); };
+    $('btnStart').onclick = () => { unlockAudio(); connectVisit(); };
 
     $('btnGps').onclick = () => {
       if (state.guide) { stopGuide(); return; }
@@ -689,11 +789,11 @@
       window.addEventListener(ev, onFirstGesture, { once: true, passive: true }));
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible') return;
+      if (!hasActiveVisit() || document.visibilityState !== 'visible') return;
       if (state.guide) requestWakeLock();
       ping();
     });
-    setInterval(() => { if (document.visibilityState === 'visible') ping(); }, PING_MS);
+    window.addEventListener('pageshow', hasActiveVisit);
 
     // Nếu người dùng cấp quyền vị trí sau khi đã bị từ chối, tự bắt đầu theo dõi lại.
     try {
@@ -710,21 +810,20 @@
     const savedPanel = store.get('panelOpen');
     const openByDefault = savedPanel === null ? !window.matchMedia('(max-width: 700px)').matches : savedPanel === '1';
     initMap();
+    showWelcome(true);
     bindEvents();
     setPanel(openByDefault, false);
     requestAnimationFrame(() => requestAnimationFrame(() => $('panel').classList.remove('no-anim')));   // từ giờ mới bật hiệu ứng trượt
     try {
       state.languages = await api('/languages');
     } catch {
-      applyUiText();
-      setStatus(t('serverErr'));
-      return;
+      // Nếu tải ngôn ngữ thất bại, vẫn cho bắt đầu bằng ngôn ngữ dự phòng.
     }
     await applyLanguage();
 
-    const started = store.get('guideStarted');
-    if (started === '1') startGuide();                       // đã từng bắt đầu → tự theo dõi GPS ngay khi mở trang
-    else if (started === null) $('overlay').hidden = false;  // lần đầu: màn hình chào + xin quyền
+    if (visitExpired) return;
+    if (visitDeadline) await connectVisit();
+    else $('btnStart').disabled = false;
   }
 
   init();

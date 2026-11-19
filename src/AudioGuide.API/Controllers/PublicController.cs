@@ -28,17 +28,24 @@ public class PublicController : ControllerBase
     public async Task<ActionResult<List<LanguageDto>>> Languages() => await _languages.GetActiveAsync();
 
     [HttpGet("places")]
-    public async Task<ActionResult<List<PlaceDto>>> Places([FromQuery] string? lang, [FromQuery] double? lat, [FromQuery] double? lng) =>
-        await _places.GetPlacesAsync(await ResolveLanguageAsync(lang), lat, lng);
+    public async Task<ActionResult<List<PlaceDto>>> Places([FromQuery] string? lang, [FromQuery] double? lat, [FromQuery] double? lng)
+    {
+        await RequireActiveVisitAsync();
+        return await _places.GetPlacesAsync(await ResolveLanguageAsync(lang), lat, lng);
+    }
 
     [HttpGet("places/{id:int}")]
-    public async Task<ActionResult<PlaceDto>> Place(int id, [FromQuery] string? lang) =>
-        await _places.GetPlaceAsync(id, await ResolveLanguageAsync(lang));
+    public async Task<ActionResult<PlaceDto>> Place(int id, [FromQuery] string? lang)
+    {
+        await RequireActiveVisitAsync();
+        return await _places.GetPlaceAsync(id, await ResolveLanguageAsync(lang));
+    }
 
     /// <summary>Địa điểm gần nhất nằm trong bán kính kích hoạt (204 nếu không có).</summary>
     [HttpGet("places/nearby")]
     public async Task<ActionResult<PlaceDto>> Nearby([FromQuery] double lat, [FromQuery] double lng, [FromQuery] string? lang)
     {
+        await RequireActiveVisitAsync();
         var place = await _places.GetNearestInRangeAsync(await ResolveLanguageAsync(lang), lat, lng);
         return place == null ? NoContent() : place;
     }
@@ -47,11 +54,12 @@ public class PublicController : ControllerBase
     [EnableRateLimiting("play")]
     public async Task<IActionResult> PlayLog([FromBody] PlayLogRequest request)
     {
+        await RequireActiveVisitAsync();
         await _stats.LogPlayAsync(request);
         return NoContent();
     }
 
-    /// <summary>Trình duyệt gọi khi mở trang và định kỳ ~10 giây để báo "tôi đang online".</summary>
+    /// <summary>Trình duyệt gọi khi bấm Bắt đầu và định kỳ ~10 giây trong phiên.</summary>
     [HttpPost("visits/ping")]
     [EnableRateLimiting("ping")]
     public async Task<IActionResult> Ping([FromBody] PingRequest request)
@@ -60,6 +68,9 @@ public class PublicController : ControllerBase
         await _visitors.PingAsync(request, client);
         return NoContent();
     }
+
+    private Task RequireActiveVisitAsync() =>
+        _visitors.RequireActiveVisitAsync(Request.Headers["X-Visit-Session"].ToString());
 
     /// <summary>Không truyền lang → chọn theo header Accept-Language của thiết bị (ngôn ngữ gốc của máy).</summary>
     private async Task<string> ResolveLanguageAsync(string? lang)

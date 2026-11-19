@@ -2,12 +2,13 @@
 -- Lưu ý: mọi mốc thời gian trong database lưu theo UTC. Giờ Việt Nam = UTC + 7 giờ.
 
 -- Các bảng chính
---   Visitors          mỗi thiết bị/trình duyệ--   VisitSessions     mỗi lượt truy cập (IP, thiết bị, trình duyệt, HĐH, ngôn ngữt (ClientId ẩn danh, ngôn ngữ thiết bị, số lượt truy cập), vị trí gần đúng, StartedAt, LastSeenAt)
+--   Visitors          mỗi thiết bị/trình duyệt (ClientId ẩn danh, ngôn ngữ thiết bị, số lượt truy cập)
+--   VisitSessions     mỗi lượt truy cập (IP, thiết bị, trình duyệt, HĐH, ngôn ngữ, vị trí gần đúng, StartedAt, LastSeenAt)
 --   PlayLogs          mỗi lượt nghe thuyết minh (địa điểm, ngôn ngữ, gps/manual, ai nghe)
 --   Places / PlaceTranslations / Languages   địa điểm, nội dung đa ngôn ngữ, danh sách ngôn ngữ
 --   AdminUsers        tài khoản quản trị
 
--- 1) AI ĐANG TRUY CẬP (có tín hiệu trong 30 giây gần nhất; trình duyệt gửi tín hiệu mỗi 10 giây)
+-- 1) AI ĐANG TRUY CẬP (phiên chưa quá 60 giây, có tín hiệu trong 30 giây gần nhất)
 SELECT v.ClientId, s.IpAddress, s.DeviceType, s.Browser, s.Os, s.LanguageCode,
        s.Latitude, s.Longitude,
        DATE_ADD(s.StartedAt, INTERVAL 7 HOUR)  AS BatDauGioVN,
@@ -15,12 +16,14 @@ SELECT v.ClientId, s.IpAddress, s.DeviceType, s.Browser, s.Os, s.LanguageCode,
 FROM VisitSessions s
 JOIN Visitors v ON v.Id = s.VisitorId
 WHERE s.LastSeenAt >= UTC_TIMESTAMP() - INTERVAL 30 SECOND
+  AND s.StartedAt > UTC_TIMESTAMP() - INTERVAL 60 SECOND
 ORDER BY s.LastSeenAt DESC;
 
 -- 2) Số người đang online
 SELECT COUNT(*) AS DangOnline
 FROM VisitSessions
-WHERE LastSeenAt >= UTC_TIMESTAMP() - INTERVAL 30 SECOND;
+WHERE LastSeenAt >= UTC_TIMESTAMP() - INTERVAL 30 SECOND
+  AND StartedAt > UTC_TIMESTAMP() - INTERVAL 60 SECOND;
 
 -- 3) Tổng quan: số thiết bị, số lượt truy cập, số lượt nghe
 SELECT (SELECT COUNT(*) FROM Visitors)      AS TongThietBi,

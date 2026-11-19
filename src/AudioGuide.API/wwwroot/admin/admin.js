@@ -410,7 +410,7 @@
         <div class="card"><div class="muted">Tổng thiết bị từ trước đến nay</div><h2>${o.totalVisitors}</h2></div>
       </div>
 
-      <div class="card"><h3>Đang online (${online.length}) <span class="muted" style="font-size:.8rem">· tự làm mới mỗi 5 giây</span></h3>
+      <div class="card"><h3>Đang online (<span id="onlineCount">${online.length}</span>) <span class="muted" style="font-size:.8rem">· tự làm mới mỗi 5 giây</span></h3>
         <div class="scroll"><table id="onlineTable">${visitHead}<tbody>${visitRows(online)}</tbody></table></div></div>
 
       <div class="grid">
@@ -443,6 +443,7 @@
         const tbl = document.querySelector('#onlineTable tbody');
         if (!tbl) { stopVisitorTimer(); return; }
         tbl.innerHTML = visitRows(fresh);
+        $('#onlineCount').textContent = fresh.length;
         const first = document.querySelector('.grid .card h2');
         if (first) first.innerHTML = `<span class="dot"></span>${ov.onlineNow}`;
       } catch { /* bỏ qua lỗi tạm thời */ }

@@ -261,8 +261,18 @@
 
   function renderMarkers() {
     placeLayer.clearLayers();
+    const nearest = state.pos
+      ? [...state.places].sort((a, b) => a.distanceMeters - b.distanceMeters)[0]
+      : null;
     state.places.forEach(p => {
-      L.circle([p.latitude, p.longitude], { radius: p.radiusMeters, color: '#c2410c', weight: 1, fillOpacity: 0.08 }).addTo(placeLayer);
+      const isNearest = nearest && p.id === nearest.id;
+      L.circle([p.latitude, p.longitude], {
+        radius: p.radiusMeters,
+        color: isNearest ? '#eab308' : '#c2410c',
+        fillColor: isNearest ? '#eab308' : '#c2410c',
+        weight: isNearest ? 3 : 1,
+        fillOpacity: 0.12
+      }).addTo(placeLayer);
       L.marker([p.latitude, p.longitude]).addTo(placeLayer)
         .bindTooltip(p.name)
         .on('click', () => manualPlay(p));
@@ -338,6 +348,7 @@
     }
     if (real && !firstFixCentered) { firstFixCentered = true; map.setView([lat, lng], 16); }
     refreshDistances();
+    renderMarkers();
     renderList();
     evaluate();
   }
@@ -662,6 +673,7 @@
       state.realGps = false;
       state.inside.clear();
       refreshDistances();
+      renderMarkers();
       renderList();
       if (state.demo && !state.guide) { unlockAudio(); startGuide(); }
       else applyGpsMode();

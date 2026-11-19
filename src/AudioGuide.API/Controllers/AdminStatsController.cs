@@ -14,11 +14,5 @@ public class AdminStatsController : ControllerBase
     public AdminStatsController(IStatsService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<StatsDto>> Get([FromQuery] int days = 30)
-    {
-        if (days < 5 || days > 30)
-            return BadRequest(new { message = "Khoảng thời gian thống kê phải từ 5 đến 30 ngày." });
-
-        return await _service.GetStatsAsync(days);
-    }
+    public async Task<ActionResult<StatsDto>> Get() => await _service.GetStatsAsync(5);
 }

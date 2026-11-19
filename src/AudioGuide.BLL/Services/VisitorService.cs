@@ -9,6 +9,7 @@ public interface IVisitorService
 {
     /// <summary>Ghi nhận/cập nhật một phiên truy cập (idempotent: gọi lặp lại chỉ làm mới LastSeenAt).</summary>
     Task PingAsync(PingRequest request, ClientInfo client);
+    Task RequireActiveVisitAsync(string sessionKey);
     /// <param name="tzOffsetMinutes">Chênh lệch múi giờ của người xem so với UTC (VN = 420) để gom theo ngày đúng giờ địa phương.</param>
     Task<VisitOverviewDto> GetOverviewAsync(int days, int tzOffsetMinutes = 0);
     Task<List<VisitDto>> GetOnlineAsync();
@@ -21,6 +22,7 @@ public class VisitorService : IVisitorService
 {
     /// <summary>Trình duyệt ping mỗi 10 giây; quá 30 giây không ping = đã rời đi.</summary>
     public static readonly TimeSpan OnlineWindow = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan VisitDuration = TimeSpan.FromSeconds(60);
 
     private static readonly Regex IdRegex = new("^[A-Za-z0-9-]{8,64}$", RegexOptions.Compiled);
     private static readonly Regex LocaleRegex = new("^[A-Za-z0-9_-]{1,35}$", RegexOptions.Compiled);
@@ -36,6 +38,10 @@ public class VisitorService : IVisitorService
             throw new BusinessException("ClientId/SessionKey không hợp lệ.");
 
         var now = DateTime.UtcNow;
+        var session = await _visitors.FindSessionAsync(sessionKey);
+        if (session != null && session.StartedAt <= now - VisitDuration)
+            throw new VisitExpiredException();
+
         var deviceLang = CleanLocale(r.DeviceLanguage, 35);
         var lang = CleanLocale(r.LanguageCode, 10).ToLowerInvariant();
         if (lang.Length == 0) lang = "vi";
@@ -49,7 +55,6 @@ public class VisitorService : IVisitorService
         visitor.LastSeenAt = now;
         if (deviceLang.Length > 0) visitor.DeviceLanguage = deviceLang;
 
-        var session = await _visitors.FindSessionAsync(sessionKey);
         if (session == null)
         {
             var ua = UserAgentParser.Parse(client.UserAgent);
@@ -91,9 +96,18 @@ public class VisitorService : IVisitorService
         await _visitors.SaveAsync();
     }
 
+    public async Task RequireActiveVisitAsync(string sessionKey)
+    {
+        if (!IdRegex.IsMatch(sessionKey)) throw new VisitExpiredException();
+        var session = await _visitors.FindSessionAsync(sessionKey);
+        if (session == null || session.StartedAt <= DateTime.UtcNow - VisitDuration)
+            throw new VisitExpiredException();
+    }
+
     public async Task<List<VisitDto>> GetOnlineAsync()
     {
-        var sessions = await _visitors.GetOnlineAsync(DateTime.UtcNow - OnlineWindow);
+        var now = DateTime.UtcNow;
+        var sessions = await _visitors.GetOnlineAsync(now - OnlineWindow, now - VisitDuration);
         return await ToDtosAsync(sessions);
     }
 
@@ -116,7 +130,7 @@ public class VisitorService : IVisitorService
         var now = DateTime.UtcNow;
         var from = now.AddDays(-days);
 
-        var online = await _visitors.CountOnlineAsync(now - OnlineWindow);
+        var online = await _visitors.CountOnlineAsync(now - OnlineWindow, now - VisitDuration);
         var sessions = await _visitors.CountSessionsAsync(from);
         var unique = await _visitors.CountActiveVisitorsAsync(from);
         var total = await _visitors.CountVisitorsAsync();
@@ -146,7 +160,8 @@ public class VisitorService : IVisitorService
     {
         var plays = (await _visitors.CountPlaysAsync(sessions.Select(s => s.VisitorId).Distinct().ToList()))
             .ToDictionary(x => x.VisitorId, x => x.Count);
-        var onlineSince = DateTime.UtcNow - OnlineWindow;
+        var now = DateTime.UtcNow;
+        var onlineSince = now - OnlineWindow;
 
         return sessions.Select(s => new VisitDto(
             s.Id, s.VisitorId,
@@ -156,7 +171,7 @@ public class VisitorService : IVisitorService
             s.GpsEnabled, s.Latitude, s.Longitude,
             Utc(s.StartedAt), Utc(s.LastSeenAt),
             (int)Math.Max(0, (s.LastSeenAt - s.StartedAt).TotalSeconds),
-            s.LastSeenAt >= onlineSince,
+            s.LastSeenAt >= onlineSince && s.StartedAt > now - VisitDuration,
             s.Visitor?.VisitCount ?? 0,
             plays.TryGetValue(s.VisitorId, out var c) ? c : 0)).ToList();
     }

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Diagnostics;
 
 namespace AudioGuide.API.Middleware;
 
-/// <summary>Chuyển exception của BLL thành HTTP status: NotFound→404, Business→400, còn lại→500.</summary>
+/// <summary>Chuyển exception của BLL thành HTTP status tương ứng.</summary>
 public class GlobalExceptionHandler : IExceptionHandler
 {
     private readonly ILogger<GlobalExceptionHandler> _logger;
@@ -14,6 +14,7 @@ public class GlobalExceptionHandler : IExceptionHandler
         var status = exception switch
         {
             NotFoundException => StatusCodes.Status404NotFound,
+            VisitExpiredException => StatusCodes.Status410Gone,
             BusinessException => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };

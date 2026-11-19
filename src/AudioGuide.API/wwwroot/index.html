@@ -10,7 +10,7 @@
 </head>
 <body>
   <header>
-    <div class="brand"><strong>Saigon Audio Guide</strong><small id="tSub"></small></div>
+    <div class="brand"><strong>Saigon Audio Guide</strong><small id="tSub"></small><small id="visitTimer" role="timer" hidden></small></div>
     <label class="langpick">
       <span aria-hidden="true">🌐</span>
       <select id="selLang" aria-label="Language"></select>
@@ -49,16 +49,17 @@
     </aside>
   </main>
 
-  <div id="overlay" hidden>
+  <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="wTitle" aria-describedby="wText">
     <div class="card">
       <h2 id="wTitle"></h2>
       <p id="wText"></p>
-      <button id="btnStart" class="primary big" type="button"></button>
+      <p id="visitError" role="status" hidden></p>
+      <button id="btnStart" class="primary big" type="button" disabled>Bắt đầu</button>
       <p id="wPrivacy" class="privacy"></p>
     </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=visit-60s"></script>
 </body>
 </html>

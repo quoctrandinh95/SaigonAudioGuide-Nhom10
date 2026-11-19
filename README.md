@@ -31,6 +31,7 @@ Build vẫn có cảnh báo `NU1902` về MySqlConnector 2.4.0, `EF1002` về SQ
 - Quản trị địa điểm, nội dung đa ngôn ngữ, ảnh, âm thanh và ngôn ngữ hỗ trợ.
 - Dịch nội dung tiếng Việt bằng Ollama; xem lại bản dịch trước khi lưu.
 - Thống kê lượt nghe, phiên truy cập, thiết bị, ngôn ngữ và khách đang online.
+- Phiên du khách có 60 giây kể từ lúc bấm **Bắt đầu**. Tải lại cùng tab giữ thời hạn cũ. Hết giờ, ứng dụng dừng định vị và thuyết minh, máy chủ từ chối yêu cầu địa điểm, ping và ghi lượt nghe của phiên đó.
 - Xác thực JWT, băm mật khẩu PBKDF2 và kiểm tra dữ liệu ở giao diện, nghiệp vụ và database.
 
 ## Công nghệ và cấu trúc

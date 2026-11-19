@@ -161,10 +161,10 @@ public interface IVisitorRepository
     Task AddSessionAsync(VisitSession session);
     Task SaveAsync();
 
-    Task<List<VisitSession>> GetOnlineAsync(DateTime sinceUtc);             // kèm Visitor, mới nhất trước
+    Task<List<VisitSession>> GetOnlineAsync(DateTime sinceUtc, DateTime startedAfterUtc);
     Task<List<VisitSession>> GetSessionsAsync(DateTime fromUtc, int skip, int take);
     Task<int> CountSessionsAsync(DateTime fromUtc);
-    Task<int> CountOnlineAsync(DateTime sinceUtc);
+    Task<int> CountOnlineAsync(DateTime sinceUtc, DateTime startedAfterUtc);
     Task<int> CountActiveVisitorsAsync(DateTime fromUtc);                   // số thiết bị khác nhau có phiên trong kỳ
     Task<int> CountVisitorsAsync();
     Task<List<VisitTimePoint>> GetTimePointsAsync(DateTime fromUtc);
@@ -199,9 +199,9 @@ public class VisitorRepository : IVisitorRepository
 
     public Task SaveAsync() => _db.SaveChangesAsync();
 
-    public Task<List<VisitSession>> GetOnlineAsync(DateTime sinceUtc) =>
+    public Task<List<VisitSession>> GetOnlineAsync(DateTime sinceUtc, DateTime startedAfterUtc) =>
         _db.VisitSessions.Include(s => s.Visitor)
-            .Where(s => s.LastSeenAt >= sinceUtc)
+            .Where(s => s.LastSeenAt >= sinceUtc && s.StartedAt > startedAfterUtc)
             .OrderByDescending(s => s.LastSeenAt).ToListAsync();
 
     public Task<List<VisitSession>> GetSessionsAsync(DateTime fromUtc, int skip, int take) =>
@@ -213,8 +213,8 @@ public class VisitorRepository : IVisitorRepository
     public Task<int> CountSessionsAsync(DateTime fromUtc) =>
         _db.VisitSessions.CountAsync(s => s.StartedAt >= fromUtc);
 
-    public Task<int> CountOnlineAsync(DateTime sinceUtc) =>
-        _db.VisitSessions.CountAsync(s => s.LastSeenAt >= sinceUtc);
+    public Task<int> CountOnlineAsync(DateTime sinceUtc, DateTime startedAfterUtc) =>
+        _db.VisitSessions.CountAsync(s => s.LastSeenAt >= sinceUtc && s.StartedAt > startedAfterUtc);
 
     public Task<int> CountActiveVisitorsAsync(DateTime fromUtc) =>
         _db.VisitSessions.Where(s => s.StartedAt >= fromUtc).Select(s => s.VisitorId).Distinct().CountAsync();
